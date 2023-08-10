@@ -1,4 +1,4 @@
-import { binToHex } from '@bitauth/libauth';
+import { binToHex } from "@bitauth/libauth";
 import {
   AbiFunction,
   Artifact,
@@ -8,16 +8,17 @@ import {
   generateRedeemScript,
   Script,
   scriptToBytecode,
-} from '@cashscript/utils';
-import { Transaction } from './Transaction';
-import { Argument, encodeArgument } from './Argument';
-import { Utxo } from './interfaces';
-import NetworkProvider from './network/NetworkProvider';
-import {
-  scriptToAddress,
-} from './utils';
-import SignatureTemplate from './SignatureTemplate';
-import { ElectrumNetworkProvider } from './network';
+} from "@cashscript/utils";
+import { Transaction } from "./Transaction.js";
+import { Argument, encodeArgument } from "./Argument.js";
+import { Utxo } from "./interfaces.js";
+import NetworkProvider from "./network/NetworkProvider.js";
+import { scriptToAddress } from "./utils.js";
+import SignatureTemplate from "./SignatureTemplate.js";
+import { ChronikNetworkProvider } from "./network/index.js";
+import { ChronikClient } from "chronik-client";
+
+const chronik = new ChronikClient("https://chronik.be.cash/xec");
 
 export class Contract {
   name: string;
@@ -26,7 +27,7 @@ export class Contract {
   opcount: number;
 
   functions: {
-    [name: string]: ContractFunction,
+    [name: string]: ContractFunction;
   };
 
   private redeemScript: Script;
@@ -34,15 +35,25 @@ export class Contract {
   constructor(
     private artifact: Artifact,
     constructorArgs: Argument[],
-    private provider: NetworkProvider = new ElectrumNetworkProvider(),
+    private provider: NetworkProvider = new ChronikNetworkProvider(
+      "mainnet",
+      chronik
+    )
   ) {
-    const expectedProperties = ['abi', 'bytecode', 'constructorInputs', 'contractName'];
+    const expectedProperties = [
+      "abi",
+      "bytecode",
+      "constructorInputs",
+      "contractName",
+    ];
     if (!expectedProperties.every((property) => property in artifact)) {
-      throw new Error('Invalid or incomplete artifact provided');
+      throw new Error("Invalid or incomplete artifact provided");
     }
 
     if (artifact.constructorInputs.length !== constructorArgs.length) {
-      throw new Error(`Incorrect number of arguments passed to ${artifact.contractName} constructor`);
+      throw new Error(
+        `Incorrect number of arguments passed to ${artifact.contractName} constructor`
+      );
     }
 
     // Encode arguments (this also performs type checking)
@@ -52,12 +63,12 @@ export class Contract {
 
     // Check there's no signature templates in the constructor
     if (encodedArgs.some((arg) => arg instanceof SignatureTemplate)) {
-      throw new Error('Cannot use signatures in constructor');
+      throw new Error("Cannot use signatures in constructor");
     }
 
     this.redeemScript = generateRedeemScript(
       asmToScript(this.artifact.bytecode),
-      encodedArgs as Uint8Array[],
+      encodedArgs as Uint8Array[]
     );
 
     // Populate the functions object with the contract's functions
@@ -91,15 +102,21 @@ export class Contract {
     return binToHex(scriptToBytecode(this.redeemScript));
   }
 
-  private createFunction(abiFunction: AbiFunction, selector?: number): ContractFunction {
+  private createFunction(
+    abiFunction: AbiFunction,
+    selector?: number
+  ): ContractFunction {
     return (...args: Argument[]) => {
       if (abiFunction.inputs.length !== args.length) {
-        throw new Error(`Incorrect number of arguments passed to function ${abiFunction.name}`);
+        throw new Error(
+          `Incorrect number of arguments passed to function ${abiFunction.name}`
+        );
       }
 
       // Encode passed args (this also performs type checking)
-      const encodedArgs = args
-        .map((arg, i) => encodeArgument(arg, abiFunction.inputs[i].type));
+      const encodedArgs = args.map((arg, i) =>
+        encodeArgument(arg, abiFunction.inputs[i].type)
+      );
 
       return new Transaction(
         this.address,
@@ -107,7 +124,7 @@ export class Contract {
         this.redeemScript,
         abiFunction,
         encodedArgs,
-        selector,
+        selector
       );
     };
   }

@@ -11,7 +11,7 @@ import {
   utf8ToBin,
   hexToBin,
   flattenBinArray,
-} from '@bitauth/libauth';
+} from "@bitauth/libauth";
 import {
   encodeInt,
   hash160,
@@ -19,16 +19,16 @@ import {
   Script,
   scriptToBytecode,
   sha256,
-} from '@cashscript/utils';
-import { Utxo, Output, Network } from './interfaces';
-import { P2PKH_OUTPUT_SIZE, VERSION_SIZE, LOCKTIME_SIZE } from './constants';
+} from "@cashscript/utils";
+import { Utxo, Output, Network } from "./interfaces";
+import { P2PKH_OUTPUT_SIZE, VERSION_SIZE, LOCKTIME_SIZE } from "./constants";
 import {
   Reason,
   FailedTransactionError,
   FailedRequireError,
   FailedTimeCheckError,
   FailedSigCheckError,
-} from './Errors';
+} from "./Errors";
 
 // ////////// SIZE CALCULATIONS ///////////////////////////////////////////////
 export function getInputSize(inputScript: Uint8Array): number {
@@ -61,7 +61,7 @@ export function getTxSizeWithoutInputs(outputs: Output[]): number {
 
   let size = VERSION_SIZE + LOCKTIME_SIZE;
   size += outputs.reduce((acc, output) => {
-    if (typeof output.to === 'string') {
+    if (typeof output.to === "string") {
       return acc + P2PKH_OUTPUT_SIZE;
     }
 
@@ -79,7 +79,7 @@ export function createInputScript(
   redeemScript: Script,
   encodedArgs: Uint8Array[],
   selector?: number,
-  preimage?: Uint8Array,
+  preimage?: Uint8Array
 ): Uint8Array {
   // Create unlock script / redeemScriptSig (add potential preimage and selector)
   const unlockScript = encodedArgs.reverse();
@@ -91,9 +91,7 @@ export function createInputScript(
   return scriptToBytecode(inputScript);
 }
 
-export function createOpReturnOutput(
-  opReturnData: string[],
-): Output {
+export function createOpReturnOutput(opReturnData: string[]): Output {
   const script = [
     Op.OP_RETURN,
     ...opReturnData.map((output: string) => toBin(output)),
@@ -103,7 +101,7 @@ export function createOpReturnOutput(
 }
 
 function toBin(output: string): Uint8Array {
-  const data = output.replace(/^0x/, '');
+  const data = output.replace(/^0x/, "");
   const encode = data === output ? utf8ToBin : hexToBin;
   return encode(data);
 }
@@ -113,7 +111,7 @@ export function createSighashPreimage(
   input: { satoshis: number },
   inputIndex: number,
   coveredBytecode: Uint8Array,
-  hashtype: number,
+  hashtype: number
 ): Uint8Array {
   const state = createTransactionContextCommon({
     inputIndex,
@@ -141,15 +139,29 @@ export function createSighashPreimage(
   return sighashPreimage;
 }
 
-export function buildError(reason: string, meepStr: string): FailedTransactionError {
+export function buildError(
+  reason: string,
+  meepStr: string
+): FailedTransactionError {
   const require = [
-    Reason.EVAL_FALSE, Reason.VERIFY, Reason.EQUALVERIFY, Reason.CHECKMULTISIGVERIFY,
-    Reason.CHECKSIGVERIFY, Reason.CHECKDATASIGVERIFY, Reason.NUMEQUALVERIFY,
+    Reason.EVAL_FALSE,
+    Reason.VERIFY,
+    Reason.EQUALVERIFY,
+    Reason.CHECKMULTISIGVERIFY,
+    Reason.CHECKSIGVERIFY,
+    Reason.CHECKDATASIGVERIFY,
+    Reason.NUMEQUALVERIFY,
   ];
   const timeCheck = [Reason.NEGATIVE_LOCKTIME, Reason.UNSATISFIED_LOCKTIME];
   const sigCheck = [
-    Reason.SIG_COUNT, Reason.PUBKEY_COUNT, Reason.SIG_HASHTYPE, Reason.SIG_DER,
-    Reason.SIG_HIGH_S, Reason.SIG_NULLFAIL, Reason.SIG_BADLENGTH, Reason.SIG_NONSCHNORR,
+    Reason.SIG_COUNT,
+    Reason.PUBKEY_COUNT,
+    Reason.SIG_HASHTYPE,
+    Reason.SIG_DER,
+    Reason.SIG_HIGH_S,
+    Reason.SIG_NULLFAIL,
+    Reason.SIG_BADLENGTH,
+    Reason.SIG_NONSCHNORR,
   ];
 
   if (toRegExp(require).test(reason)) {
@@ -168,7 +180,9 @@ export function buildError(reason: string, meepStr: string): FailedTransactionEr
 }
 
 function toRegExp(reasons: string[]): RegExp {
-  return new RegExp(reasons.join('|').replace(/\(/g, '\\(').replace(/\)/g, '\\)'));
+  return new RegExp(
+    reasons.join("|").replace(/\(/g, "\\(").replace(/\)/g, "\\)")
+  );
 }
 
 // ////////// MISC ////////////////////////////////////////////////////////////
@@ -180,7 +194,10 @@ export function meep(tx: any, utxos: Utxo[], script: Script): string {
 export function scriptToAddress(script: Script, network: string): string {
   const lockingBytecode = scriptToLockingBytecode(script);
   const prefix = getNetworkPrefix(network);
-  const address = lockingBytecodeToCashAddress(lockingBytecode, prefix) as string;
+  const address = lockingBytecodeToCashAddress(
+    lockingBytecode,
+    prefix
+  ) as string;
   return address;
 }
 
@@ -192,30 +209,34 @@ export function scriptToLockingBytecode(script: Script): Uint8Array {
 }
 
 /**
-* Helper function to convert an address to a locking script
-*
-* @param address   Address to convert to locking script
-*
-* @returns a locking script corresponding to the passed address
-*/
+ * Helper function to convert an address to a locking script
+ *
+ * @param address   Address to convert to locking script
+ *
+ * @returns a locking script corresponding to the passed address
+ */
 export function addressToLockScript(address: string): Uint8Array {
   const result = cashAddressToLockingBytecode(address);
 
-  if (typeof result === 'string') throw new Error(result);
+  if (typeof result === "string") throw new Error(result);
 
   return result.bytecode;
 }
 
-export function getNetworkPrefix(network: string): 'bitcoincash' | 'bchtest' | 'bchreg' {
+export function getNetworkPrefix(
+  network: string
+): "ecash" | "ectest" | "ecreg" {
   switch (network) {
     case Network.MAINNET:
-      return 'bitcoincash';
+      return "ecash";
+    // case Network.STAGING:
+    // return "ectest";
     case Network.TESTNET:
-      return 'bchtest';
+      return "ectest";
     case Network.REGTEST:
-      return 'bchreg';
+      return "ecreg";
     default:
-      return 'bitcoincash';
+      return "ecash";
   }
 }
 
@@ -224,13 +245,13 @@ export function getNetworkPrefix(network: string): 'bitcoincash' | 'bchtest' | '
 function encodeNullDataScript(chunks: (number | Uint8Array)[]): Uint8Array {
   return flattenBinArray(
     chunks.map((chunk) => {
-      if (typeof chunk === 'number') {
+      if (typeof chunk === "number") {
         return new Uint8Array([chunk]);
       }
 
       const pushdataOpcode = getPushDataOpcode(chunk);
       return new Uint8Array([...pushdataOpcode, ...chunk]);
-    }),
+    })
   );
 }
 
@@ -240,5 +261,5 @@ function getPushDataOpcode(data: Uint8Array): Uint8Array {
   if (byteLength === 0) return Uint8Array.from([0x4c, 0x00]);
   if (byteLength < 76) return Uint8Array.from([byteLength]);
   if (byteLength < 256) return Uint8Array.from([0x4c, byteLength]);
-  throw Error('Pushdata too large');
+  throw Error("Pushdata too large");
 }

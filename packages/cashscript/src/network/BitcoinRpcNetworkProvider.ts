@@ -1,16 +1,12 @@
-import { Utxo, Network } from '../interfaces';
-import NetworkProvider from './NetworkProvider';
+import { Utxo, Network } from "../interfaces";
+import NetworkProvider from "./NetworkProvider";
 
-const RpcClientRetry = require('bitcoin-rpc-promise-retry');
+const RpcClientRetry = require("bitcoin-rpc-promise-retry");
 
 export default class BitcoinRpcNetworkProvider implements NetworkProvider {
   private rpcClient: RpcClientRetry;
 
-  constructor(
-    public network: Network,
-    url: string,
-    opts?: object,
-  ) {
+  constructor(public network: Network, url: string, opts?: object) {
     this.rpcClient = new RpcClientRetry(url, opts);
   }
 
@@ -64,18 +60,38 @@ interface RpcClientRetry {
     maxConf?: number,
     addresses?: string[],
     includeUnsafe?: boolean,
-    queryOptions?: object,
+    queryOptions?: object
   ): Promise<ListUnspentItem[]>;
   getBlockCount(): Promise<number>;
-  getRawTransaction(txid: string, verbose?: boolean, blockHash?: string): Promise<string>;
-  sendRawTransaction(hexString: string, allowHighFees?: boolean): Promise<string>;
+  getRawTransaction(
+    txid: string,
+    verbose?: boolean,
+    blockHash?: string
+  ): Promise<string>;
+  sendRawTransaction(
+    hexString: string,
+    allowHighFees?: boolean
+  ): Promise<string>;
 
   // below are not required for NetworkProvider interface, but very useful
   generate(nBlocks: number, maxTries?: number): Promise<string[]>;
-  generateToAddress(nBlocks: number, address: string, maxTries?: number): Promise<string[]>;
+  generateToAddress(
+    nBlocks: number,
+    address: string,
+    maxTries?: number
+  ): Promise<string[]>;
   getNewAddress(label?: string): Promise<string>;
   dumpPrivKey(address: string): Promise<string>;
-  getBalance(dummy?: string, minConf?: number, includeWatchOnly?: boolean): Promise<number>;
+  getBalance(
+    dummy?: string,
+    minConf?: number,
+    includeWatchOnly?: boolean
+  ): Promise<number>;
   getBlock(blockHash: string, verbosity?: number): Promise<string>;
-  importAddress(address: string, label?: string, rescan?: boolean, p2sh?: boolean): Promise<void>;
+  importAddress(
+    address: string,
+    label?: string,
+    rescan?: boolean,
+    p2sh?: boolean
+  ): Promise<void>;
 }

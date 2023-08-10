@@ -8,8 +8,8 @@ import {
   decodeTransaction,
   Transaction as LibauthTransaction,
   instantiateSecp256k1,
-} from '@bitauth/libauth';
-import delay from 'delay';
+} from "@bitauth/libauth";
+import delay from "delay";
 import {
   AbiFunction,
   hash160,
@@ -17,14 +17,14 @@ import {
   placeholder,
   Script,
   scriptToBytecode,
-} from '@cashscript/utils';
+} from "@cashscript/utils";
 import {
   Utxo,
   Output,
   Recipient,
   isSignableUtxo,
   TransactionDetails,
-} from './interfaces';
+} from "./interfaces";
 import {
   meep,
   createInputScript,
@@ -35,12 +35,12 @@ import {
   buildError,
   addressToLockScript,
   createSighashPreimage,
-} from './utils';
-import { P2SH_OUTPUT_SIZE, DUST_LIMIT } from './constants';
-import NetworkProvider from './network/NetworkProvider';
-import SignatureTemplate from './SignatureTemplate';
+} from "./utils";
+import { P2SH_OUTPUT_SIZE, DUST_LIMIT } from "./constants";
+import NetworkProvider from "./network/NetworkProvider";
+import SignatureTemplate from "./SignatureTemplate";
 
-const bip68 = require('bip68');
+const bip68 = require("bip68");
 
 export class Transaction {
   private inputs: Utxo[] = [];
@@ -58,7 +58,7 @@ export class Transaction {
     private redeemScript: Script,
     private abiFunction: AbiFunction,
     private args: (Uint8Array | SignatureTemplate)[],
-    private selector?: number,
+    private selector?: number
   ) {}
 
   from(input: Utxo): this;
@@ -77,7 +77,10 @@ export class Transaction {
   experimentalFromP2PKH(input: Utxo, template: SignatureTemplate): this;
   experimentalFromP2PKH(inputs: Utxo[], template: SignatureTemplate): this;
 
-  experimentalFromP2PKH(inputOrInputs: Utxo | Utxo[], template: SignatureTemplate): this {
+  experimentalFromP2PKH(
+    inputOrInputs: Utxo | Utxo[],
+    template: SignatureTemplate
+  ): this {
     if (!Array.isArray(inputOrInputs)) {
       inputOrInputs = [inputOrInputs];
     }
@@ -93,12 +96,12 @@ export class Transaction {
   to(outputs: Recipient[]): this;
 
   to(toOrOutputs: string | Recipient[], amount?: number): this {
-    if (typeof toOrOutputs === 'string' && typeof amount === 'number') {
+    if (typeof toOrOutputs === "string" && typeof amount === "number") {
       this.outputs.push({ to: toOrOutputs, amount });
     } else if (Array.isArray(toOrOutputs) && amount === undefined) {
       this.outputs = this.outputs.concat(toOrOutputs);
     } else {
-      throw new Error('Incorrect arguments passed to function \'to\'');
+      throw new Error("Incorrect arguments passed to function 'to'");
     }
     return this;
   }
@@ -138,7 +141,7 @@ export class Transaction {
   }
 
   async build(): Promise<string> {
-    this.locktime = this.locktime ?? await this.provider.getBlockHeight();
+    this.locktime = this.locktime ?? (await this.provider.getBlockHeight());
     await this.setInputsAndOutputs();
 
     const secp256k1 = await instantiateSecp256k1();
@@ -152,9 +155,10 @@ export class Transaction {
     }));
 
     const outputs = this.outputs.map((output) => {
-      const lockingBytecode = typeof output.to === 'string'
-        ? addressToLockScript(output.to)
-        : output.to;
+      const lockingBytecode =
+        typeof output.to === "string"
+          ? addressToLockScript(output.to)
+          : output.to;
 
       const satoshis = bigIntToBinUint64LE(BigInt(output.amount));
 
@@ -176,11 +180,20 @@ export class Transaction {
         const pubkey = utxo.template.getPublicKey(secp256k1);
         const pubkeyHash = hash160(pubkey);
 
-        const addressContents = { payload: pubkeyHash, type: AddressType.p2pkh };
+        const addressContents = {
+          payload: pubkeyHash,
+          type: AddressType.p2pkh,
+        };
         const prevOutScript = addressContentsToLockingBytecode(addressContents);
 
         const hashtype = utxo.template.getHashType();
-        const preimage = createSighashPreimage(transaction, utxo, i, prevOutScript, hashtype);
+        const preimage = createSighashPreimage(
+          transaction,
+          utxo,
+          i,
+          prevOutScript,
+          hashtype
+        );
         const sighash = hash256(preimage);
 
         const signature = utxo.template.generateSignature(sighash, secp256k1);
@@ -198,18 +211,33 @@ export class Transaction {
         // First signature is used for sighash preimage (maybe not the best way)
         if (covenantHashType < 0) covenantHashType = arg.getHashType();
 
-        const preimage = createSighashPreimage(transaction, utxo, i, bytecode, arg.getHashType());
+        const preimage = createSighashPreimage(
+          transaction,
+          utxo,
+          i,
+          bytecode,
+          arg.getHashType()
+        );
         const sighash = hash256(preimage);
 
         return arg.generateSignature(sighash, secp256k1);
       });
 
       const preimage = this.abiFunction.covenant
-        ? createSighashPreimage(transaction, utxo, i, bytecode, covenantHashType)
+        ? createSighashPreimage(
+            transaction,
+            utxo,
+            i,
+            bytecode,
+            covenantHashType
+          )
         : undefined;
 
       const inputScript = createInputScript(
-        this.redeemScript, completeArgs, this.selector, preimage,
+        this.redeemScript,
+        completeArgs,
+        this.selector,
+        preimage
       );
 
       inputScripts.push(inputScript);
@@ -229,17 +257,22 @@ export class Transaction {
     const tx = await this.build();
     try {
       const txid = await this.provider.sendRawTransaction(tx);
-      return raw ? await this.getTxDetails(txid, raw) : await this.getTxDetails(txid);
+      return raw
+        ? await this.getTxDetails(txid, raw)
+        : await this.getTxDetails(txid);
     } catch (e) {
       const reason = e.error ?? e.message;
       throw buildError(reason, meep(tx, this.inputs, this.redeemScript));
     }
   }
 
-  private async getTxDetails(txid: string): Promise<TransactionDetails>
+  private async getTxDetails(txid: string): Promise<TransactionDetails>;
   private async getTxDetails(txid: string, raw: true): Promise<string>;
 
-  private async getTxDetails(txid: string, raw?: true): Promise<TransactionDetails | string> {
+  private async getTxDetails(
+    txid: string,
+    raw?: true
+  ): Promise<TransactionDetails | string> {
     for (let retries = 0; retries < 1200; retries += 1) {
       await delay(500);
       try {
@@ -247,7 +280,9 @@ export class Transaction {
 
         if (raw) return hex;
 
-        const libauthTransaction = decodeTransaction(hexToBin(hex)) as LibauthTransaction;
+        const libauthTransaction = decodeTransaction(
+          hexToBin(hex)
+        ) as LibauthTransaction;
         return { ...libauthTransaction, txid, hex };
       } catch (ignored) {
         // ignored
@@ -255,7 +290,9 @@ export class Transaction {
     }
 
     // Should not happen
-    throw new Error('Could not retrieve transaction details for over 10 minutes');
+    throw new Error(
+      "Could not retrieve transaction details for over 10 minutes"
+    );
   }
 
   async meep(): Promise<string> {
@@ -265,13 +302,13 @@ export class Transaction {
 
   private async setInputsAndOutputs(): Promise<void> {
     if (this.outputs.length === 0) {
-      throw Error('Attempted to build a transaction without outputs');
+      throw Error("Attempted to build a transaction without outputs");
     }
 
     // Replace all SignatureTemplate with 65-length placeholder Uint8Arrays
-    const placeholderArgs = this.args.map((arg) => (
+    const placeholderArgs = this.args.map((arg) =>
       arg instanceof SignatureTemplate ? placeholder(65) : arg
-    ));
+    );
 
     // Create a placeholder preimage of the correct size
     const placeholderPreimage = this.abiFunction.covenant
@@ -284,7 +321,7 @@ export class Transaction {
       this.redeemScript,
       placeholderArgs,
       this.selector,
-      placeholderPreimage,
+      placeholderPreimage
     );
 
     // Add one extra byte per input to over-estimate tx-in count
@@ -301,8 +338,12 @@ export class Transaction {
     if (this.inputs.length > 0) {
       // If inputs are already defined, the user provided the UTXOs
       // and we perform no further UTXO selection
-      if (!this.hardcodedFee) fee += this.inputs.length * inputSize * this.feePerByte;
-      satsAvailable = this.inputs.reduce((acc, input) => acc + input.satoshis, 0);
+      if (!this.hardcodedFee)
+        fee += this.inputs.length * inputSize * this.feePerByte;
+      satsAvailable = this.inputs.reduce(
+        (acc, input) => acc + input.satoshis,
+        0
+      );
     } else {
       // If inputs are not defined yet, we retrieve the contract's UTXOs and perform selection
       const utxos = await this.provider.getUtxos(this.address);
@@ -326,7 +367,11 @@ export class Transaction {
     let change = satsAvailable - amount - fee;
 
     if (change < 0) {
-      throw new Error(`Insufficient funds: available (${satsAvailable}) < needed (${amount + fee}).`);
+      throw new Error(
+        `Insufficient funds: available (${satsAvailable}) < needed (${
+          amount + fee
+        }).`
+      );
     }
 
     // Account for the fee of a change output
